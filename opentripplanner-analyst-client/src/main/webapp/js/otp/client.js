@@ -28,24 +28,35 @@ var map = new L.Map('map', {
 	// what we really need is a fade transition between old and new tiles without removing the old ones
 });
 
-var mapboxURL = "https://tiles.mapbox.com/v3/username.map-abcdefgh/{z}/{x}/{y}.png";
-var OSMURL    = "http://{s}.mqcdn.com/tiles/1.0.0/osm/{z}/{x}/{y}.png";
-var aerialURL = "http://{s}.mqcdn.com/naip/{z}/{x}/{y}.png";
+var mapboxURL = "https://{s}.tiles.mapbox.com/v3/examples.map-vyofok3q/{z}/{x}/{y}.png";
+var OSMURL    = "http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+var MQURL     = "http://{s}.mqcdn.com/tiles/1.0.0/osm/{z}/{x}/{y}.png";
+var transURL  = "http://{s}.tile2.opencyclemap.org/transport/{z}/{x}/{y}.png";
+var aerialURL = "https://{s}.tiles.mapbox.com/v3/openstreetmap.map-4wvf9l0l/{z}/{x}/{y}.png";
 
 var mapboxAttrib = "Tiles from <a href='http://mapbox.com/about/maps' target='_blank'> Streets</a>";
 var mapboxLayer = new L.TileLayer(mapboxURL, {maxZoom: 17, attribution: mapboxAttrib});
 
 var osmAttrib = 'Map data &copy; 2011 OpenStreetMap contributors';
 var osmLayer = new L.TileLayer(OSMURL, 
-		{subdomains: ["otile1","otile2","otile3","otile4"], maxZoom: 18, attribution: osmAttrib});
+		{subdomains: ["a","b","c"], maxZoom: 18, attribution: osmAttrib});
+
+var mqLayer = new L.TileLayer(MQURL,
+                {subdomains: ["otile1","otile2","otile3","otile4"], maxZoom: 18, attribution: osmAttrib});
+
+var transLayer = new L.TileLayer(transURL,
+                {subdomains: ["a","b","c"], maxZoom: 18, attribution: osmAttrib});
+
 
 var aerialLayer = new L.TileLayer(aerialURL, 
-		{subdomains: ["oatile1","oatile2","oatile3","oatile4"], maxZoom: 18, attribution: osmAttrib});
+		{maxZoom: 18, attribution: mapboxAttrib});
 
 var flags = {
 	twoEndpoint: false,
-	twoSearch: false
+	twoSearch: false,
+        genacc: false
 };
+
 
 // convert a map of query parameters into a query string, 
 // expanding Array values into multiple query parameters
@@ -71,14 +82,20 @@ var buildQuery = function(params) {
 var analystUrl = "/opentripplanner-api-webapp/ws/tile/{z}/{x}/{y}.png"; 
 var analystLayer = new L.TileLayer(analystUrl, {attribution: osmAttrib});
 
+var genaccUrl = "/opentripplannter-api-webapp/ws/tileb/{z}/{x}/{y}.png";
+var genaccLayer = new L.TileLayer(genaccUrl, {attribution: osmAttrib});
+
 var baseMaps = {
     "OSM": osmLayer,
-    "MapBox": mapboxLayer,
-    "Aerial Photo": aerialLayer
+    "MapQuest": mqLayer,
+    "MapBox Streets": mapboxLayer,
+    "Transport": transLayer,
+    "MapBox Satellite": aerialLayer
 };
 	        
 var overlayMaps = {
     "Analyst Tiles": analystLayer,
+    "General Accessibility Tiles": genaccLayer
 };
 
 var initLocation = INIT_LOCATION;
@@ -114,7 +131,7 @@ destMarker.on('dragend', mapSetupTool);
 // add layers to map 
 // do not add analyst layer yet -- it will be added in refresh() once params are pulled in
 
-map.addLayer(osmLayer);
+map.addLayer(mapboxLayer);
 map.addLayer(origMarker);
 map.addControl(new L.Control.Layers(baseMaps, overlayMaps));
 
@@ -123,7 +140,7 @@ function mapClick(e) {
 	++nclicks;
 	if (nclicks == 1) {
 		setTimeout(function(){
-	          if(nclicks == 1) {
+	          if(nclicks == 1 && !(flags.genacc)) {
 	        	  // after n ms there was no other click: this is a single click
         	    origMarker.setLatLng(e.latlng);
         	    mapSetupTool();	            
@@ -149,7 +166,7 @@ function mapSetupTool() {
 	switch($('#searchTypeSelect').val()) {
 	case 'single':
 		params.layers = 'traveltime';
-		params.styles = 'color30';
+		params.styles = 'colorchi';
 		break;
 	case 'ppa':
 		params.layers = 'hagerstrand';
@@ -162,8 +179,11 @@ function mapSetupTool() {
 	case 'diff1':
 		params.layers = 'difference';
 		params.styles = 'difference';
-		params.bannedRoutes = ["Test_Purple", ""];
 		break;
+        case 'access':
+                params.layers = 'traveltime';
+                params.styles = 'color30';
+                break;
 	}
 	// store one-element arrays so we can append as needed for the second search
 	params.time = [$('#setupTime').val()];
@@ -196,11 +216,16 @@ function mapSetupTool() {
 	}
     
     // get origin and destination coordinate from map markers
-	var o = origMarker.getLatLng();
+    if(!(flags.genacc)){
+        var o = origMarker.getLatLng();
 	params.fromPlace = [o.lat + ',' + o.lng];
-    if (flags.twoEndpoint) {
-    	var d = destMarker.getLatLng();
-    	params.fromPlace.push(d.lat + ',' + d.lng);
+    
+        if (flags.twoEndpoint) {
+    	    var d = destMarker.getLatLng();
+    	    params.fromPlace.push(d.lat + ',' + d.lng);
+        }
+    } else{
+        params.fromPlace = ['41.85,-87.65'];
     }
 	// set from and to places to the same string(s) so they work for both arriveBy and departAfter
 	params.toPlace = params.fromPlace;
@@ -213,7 +238,8 @@ function mapSetupTool() {
 	if (analystLayer != null)
 		map.removeLayer(analystLayer);
 	analystLayer._url = URL;
-    map.addLayer(analystLayer);
+        if (!(flags.genacc))
+            map.addLayer(analystLayer);
 	legend.src = "/opentripplanner-api-webapp/ws/legend.png?width=300&height=40&styles=" 
 		+ params.styles;
 
@@ -320,24 +346,41 @@ $('#searchTypeSelect').change( function() {
 		// switch to or stay in one-endpoint mode
 		map.removeLayer(destMarker);
 		flags.twoEndpoint = false;
-	} else { 
+                if (flags.genacc) {
+                        map.addLayer(origMarker);
+                        flags.genacc = false;
+                }
+	} else if (type == 'access') {
+                // switch to or stay in general accessibility mode
+                map.removeLayer(origMarker);
+                map.removeLayer(destMarker);
+                flags.twoEndpoint = false;
+                flags.genacc = true;
+        } else { 
 		if (!(flags.twoEndpoint)) { 
-			// switch from one-endpoint to two-endpoint mode
+			// switch to two-endpoint mode
 			var llo = origMarker.getLatLng();
 			var lld = destMarker.getLatLng();
 			lld.lat = llo.lat;
 			lld.lng = llo.lng + 0.02;
 			map.addLayer(destMarker);
 			flags.twoEndpoint = true;
+                        if (flags.genacc) {
+                            map.addLayer(origMarker);
+                            flags.genacc = false;
+                        }
 		}
 	}
 	if (type == 'single') {
 		$('.secondaryControl').fadeOut( 500 );
 		flags.twoSearch = false;
-	} else { 
+	} else if (type != 'access') { 
 		$('.secondaryControl').fadeIn( 500 );
 		flags.twoSearch = true;
-	}
+	} else {
+                $('.secondaryControl').fadeOut( 500 );
+                flags.twoSearch = false;
+        }
 	if (type == 'ppa') {
 		// lock arriveBy selectors and rename endpoints
 		$('#headerA').text('Origin Setup');
