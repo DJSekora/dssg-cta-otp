@@ -180,10 +180,10 @@ function mapSetupTool() {
 		params.layers = 'difference';
 		params.styles = 'difference';
 		break;
-        case 'access':
-                params.layers = 'traveltime';
-                params.styles = 'color30';
-                break;
+    case 'access':
+        params.layers = 'gtraveltime';
+        params.styles = 'colorchi';
+        break;
 	}
 	// store one-element arrays so we can append as needed for the second search
 	params.time = [$('#setupTime').val()];
@@ -218,14 +218,17 @@ function mapSetupTool() {
     // get origin and destination coordinate from map markers
     if(!(flags.genacc)){
         var o = origMarker.getLatLng();
-	params.fromPlace = [o.lat + ',' + o.lng];
+	    params.fromPlace = [o.lat + ',' + o.lng];
     
         if (flags.twoEndpoint) {
     	    var d = destMarker.getLatLng();
     	    params.fromPlace.push(d.lat + ',' + d.lng);
         }
     } else{
-        params.fromPlace = ['41.85,-87.65'];
+    	var ori = ['41.8794,-87.6397']
+        params.fromPlace = ['41.8877,-87.6205'];
+        for(oll in ori)
+            params.fromPlace.push(oll);
     }
 	// set from and to places to the same string(s) so they work for both arriveBy and departAfter
 	params.toPlace = params.fromPlace;

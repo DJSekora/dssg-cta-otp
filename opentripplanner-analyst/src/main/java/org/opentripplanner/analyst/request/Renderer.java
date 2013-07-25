@@ -90,6 +90,47 @@ public class Renderer {
         }
     }
     
+    //For general accessibility (array of requests)
+    public Response getResponse (TileRequest tileRequest, 
+            RoutingRequest[] sptRequest,
+            RenderRequest renderRequest) throws Exception {
+
+        Tile tile = tileCache.get(tileRequest);
+        ShortestPathTree[] spt = new ShortestPathTree[sptRequest.length];
+        for(int i=0;i<spt.length;i++)		
+        	spt[i] = sptCache.get(sptRequest[i]);
+        
+        BufferedImage image;
+        switch (renderRequest.layer) {
+        case GTRAVELTIME :
+        default :
+            image = tile.sptAverage(1, spt, 0, renderRequest);
+        }
+        
+        // add a timestamp to the image if requested. 
+        // of course this will make it useless as a raster for analysis, but it's good for animations.
+        if (renderRequest.timestamp) {
+            DateFormat df = DateFormat.getDateTimeInstance();
+            df.setTimeZone(TimeZone.getTimeZone("America/New_York"));
+            String ds = df.format(new Date(sptRequest[0].dateTime * 1000));
+            shadowWrite(image, ds, sptRequest[0].from.toString());
+
+            Graphics2D g2d = image.createGraphics();
+            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC));
+            BufferedImage legend = Tile.getLegend(renderRequest.style, 300, 50);
+            g2d.drawImage(legend, 0, image.getHeight()-50, null);
+            g2d.dispose();
+        }
+                
+        // geotiff kludge
+        if (renderRequest.format.toString().equals("image/geotiff")) {
+            GridCoverage2D gc = tile.getGridCoverage2D(image);
+            return generateStreamingGeotiffResponse(gc);
+        } else {
+            return generateStreamingImageResponse(image, renderRequest.format);
+        }
+    }
+    
     private void shadowWrite(BufferedImage image, String... strings) {
         Graphics2D g2d = image.createGraphics();
         g2d.setFont(new Font("Sans", Font.PLAIN, 25));
