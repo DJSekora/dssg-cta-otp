@@ -82,8 +82,9 @@ var buildQuery = function(params) {
 var analystUrl = "/opentripplanner-api-webapp/ws/tile/{z}/{x}/{y}.png"; 
 var analystLayer = new L.TileLayer(analystUrl, {attribution: osmAttrib});
 
-var genaccUrl = "/opentripplannter-api-webapp/ws/tileb/{z}/{x}/{y}.png";
-var genaccLayer = new L.TileLayer(genaccUrl, {attribution: osmAttrib});
+// Thought I was going to need new tiles, don't think this will actually be necessary.
+//var genaccUrl = "/opentripplannter-api-webapp/ws/tileb/{z}/{x}/{y}.png";
+//var genaccLayer = new L.TileLayer(genaccUrl, {attribution: osmAttrib});
 
 var baseMaps = {
     "OSM": osmLayer,
@@ -94,8 +95,7 @@ var baseMaps = {
 };
 	        
 var overlayMaps = {
-    "Analyst Tiles": analystLayer,
-    "General Accessibility Tiles": genaccLayer
+    "Analyst Tiles": analystLayer
 };
 
 var initLocation = INIT_LOCATION;
@@ -141,11 +141,11 @@ function mapClick(e) {
 	if (nclicks == 1) {
 		setTimeout(function(){
 	          if(nclicks == 1 && !(flags.genacc)) {
-	        	  // after n ms there was no other click: this is a single click
+	            // after n ms there was no other click: this is a single click
         	    origMarker.setLatLng(e.latlng);
         	    mapSetupTool();	            
 	          } else {
-	            // double clicked
+	            // double clicked, or else we're not using pointers so we don't care
 	          }
 	          nclicks = 0;
 		}, 500);
@@ -180,10 +180,10 @@ function mapSetupTool() {
 		params.layers = 'difference';
 		params.styles = 'difference';
 		break;
-    case 'access':
-        params.layers = 'gtraveltime';
-        params.styles = 'colorchi';
-        break;
+        case 'access':
+                params.layers = 'gtraveltime';
+                params.styles = 'colorchi';
+                break;
 	}
 	// store one-element arrays so we can append as needed for the second search
 	params.time = [$('#setupTime').val()];
@@ -225,10 +225,14 @@ function mapSetupTool() {
     	    params.fromPlace.push(d.lat + ',' + d.lng);
         }
     } else{
-    	var ori = ['41.8794,-87.6397']
         params.fromPlace = ['41.8877,-87.6205'];
-        for(oll in ori)
-            params.fromPlace.push(oll);
+        var ori = ['41.8794,-87.6097'];
+        for(oll in ori){
+            params.fromPlace.push(ori[oll]);
+        }
+        
+        /*for()
+        */
     }
 	// set from and to places to the same string(s) so they work for both arriveBy and departAfter
 	params.toPlace = params.fromPlace;
@@ -241,8 +245,7 @@ function mapSetupTool() {
 	if (analystLayer != null)
 		map.removeLayer(analystLayer);
 	analystLayer._url = URL;
-        if (!(flags.genacc))
-            map.addLayer(analystLayer);
+        map.addLayer(analystLayer);
 	legend.src = "/opentripplanner-api-webapp/ws/legend.png?width=300&height=40&styles=" 
 		+ params.styles;
 
